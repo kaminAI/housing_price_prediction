@@ -1,0 +1,9 @@
+*.DS_Store
+*.csv
+*.log
+*.pkl
+*.vscode
+*.ipynb_checkpoints
+*__pycache__
+model_checkpoints
+tb_logs
