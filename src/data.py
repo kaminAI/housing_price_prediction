@@ -81,7 +81,7 @@ def get_property_details(href, try_num=1):
 
             property_details_h4 = soup.find_all('h4', attrs={'class': '_1544W _10w08'})
             try: # not always available
-                d['area_and_n_rooms'] = property_details_h4[0].text 
+                d['area_and_n_rooms'] = property_details_h4[0].text # its not so good having this joined, manual cleaning needed when e.g area not existing
                 d['location'] = property_details_h4[1].text 
 
             except IndexError:
