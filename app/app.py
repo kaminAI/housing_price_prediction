@@ -5,6 +5,13 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from bs4 import BeautifulSoup
 import requests
+import os; import sys; from pathlib import Path
+import torch
+root = Path(__file__).parents[1]
+sys.path.append(str(root))
+
+from src.data import preprocess_inference
+from src.model import Regressor
 
 # web scraping booli
 @st.cache
@@ -24,6 +31,11 @@ def load_data(url):
     property_details_h1 = soup.find('h1', attrs={'class': 'lzFZY _10w08'})
     d['adress'] = property_details_h1.text
 
+    property_details_h2 = soup.find('h2', attrs={'class': 'lzFZY _10w08'})
+    d['Utropspris'] = property_details_h2.text
+
+    
+
     property_details_h4 = soup.find_all('h4', attrs={'class': '_1544W _10w08'})
     
     try: # not always available
@@ -34,6 +46,10 @@ def load_data(url):
         pass
 
     d['url'] = url
+
+    for key in ["Utropspris", "Avgift", "Driftskostnad", "Våning","Byggår","area_and_n_rooms", "location"]:
+        if key not in d.keys():
+            d[key]=None
 
     return d
 
@@ -54,7 +70,7 @@ Usage:
 
 url = st.text_input(label='The URL link', value='https://www.booli.se', help='paste link to the ad from www.booli.se')
 
-valid_url  = 'booli.se/annons/' in url
+valid_url  = 'booli.se/annons/' in url or 'booli.se/bostad/' in url
 
 if valid_url:
 
@@ -67,8 +83,22 @@ if valid_url:
 
     data  = load_data(url)
 
-    st.dataframe(pd.DataFrame(data, index=[0]))
+    df = pd.DataFrame(data, index=[0])
 
+    st.dataframe(df)
+
+    df_inference  = preprocess_inference(df)
+
+    st.dataframe(df_inference)
+
+
+    model_loaded = Regressor().load_from_checkpoint(root / 'model_checkpoints' / 'epoch=143-avg_rmse_val=7.32.ckpt')
+    model_loaded.eval()
+
+    with torch.no_grad():
+        pred = model_loaded(torch.tensor(df_inference.values).float())
+
+    st.dataframe(pred.numpy())
 
 
 

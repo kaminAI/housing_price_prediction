@@ -6,7 +6,7 @@ import time
 import pandas as pd
 from category_encoders.one_hot import OneHotEncoder
 import joblib
-
+from pathlib import Path
 
 class StatusCodeError(Exception):
     """HTTP status code error"""
@@ -151,3 +151,66 @@ def post_process(df):
     df.reset_index(drop=True, inplace=True)
      
     return df
+
+
+
+
+def preprocess_inference(df):
+
+    root = Path(__file__).parents[1]
+
+    scaler = joblib.load(root / 'data' /'scaler.pkl') 
+    top_X_location = joblib.load(root / 'data' /'top_X_location.pkl')
+    ohe = joblib.load(root / 'data' /'location_one_hot_encoder.pkl')
+
+    columns_mapping = {
+            "Utropspris": "price_ask",
+            "Avgift": "montly_fee_cost",
+            "Driftskostnad": "montly_operating_cost",
+            "Våning": "floor",
+            "Byggår": "construction_year",
+            "area_and_n_rooms": "area_and_n_rooms",
+            "location": "location"
+        }
+
+    df = df.rename(
+        columns=columns_mapping
+    )
+
+    columns_to_keep = columns_mapping.values() # will not be needed 
+    df = df[columns_to_keep]
+
+    df['price_ask'] = df['price_ask'].str.strip(' kr').str.replace(' ', '').astype(float)
+    df['montly_fee_cost'] = df['montly_fee_cost'].str.strip(' kr/mån').str.replace(' ', '').astype(float)
+    df['montly_operating_cost'] = df['montly_operating_cost'].str.strip(' kr/mån').str.replace(' ', '').astype(float)
+    df['floor'] = df['floor'].str.strip(' tr').str.replace('½','.5').str.replace('BV','0').astype(float)
+    df['construction_year'] = df ['construction_year'].astype(float)
+
+    df[['area', 'n_rooms']] = df['area_and_n_rooms'].str.split(',', expand=True)
+    df.drop(columns=['area_and_n_rooms'], inplace=True)
+    df['area'] = df['area'].str.strip(' m²').str.replace('½','.5').astype(float)
+    df['n_rooms'] = df['n_rooms'].str.strip(' rum').str.replace('½','.5').astype(float)
+
+    df['list_price_per_m2'] = df.price_ask/df.area
+
+    df['location'] = df['location'].str.replace('Lägenhet, ', '').str.lower()
+    df.loc[~df['location'].isin(top_X_location), 'location'] = 'other'
+    dummies = ohe.transform(df[['location']])
+    df = df.drop('location', axis = 1)
+    df = df.join(dummies)
+    
+    num_cols, cat_cols = df.columns[:8], df.columns[8:]
+    df = pd.concat([
+        pd.DataFrame(
+            data=scaler.transform(df[num_cols]),
+            columns=num_cols,
+            index=df.index
+        ),
+        df[cat_cols]
+        ],
+        axis=1
+    )
+    
+    df.fillna(-1, inplace=True)
+    return df
+
