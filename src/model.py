@@ -13,12 +13,15 @@ class Regressor(pl.LightningModule):
         self.fc2 = nn.Linear(32, 64)
         self.fc3 = nn.Linear(64, 32)
         self.fc4 = nn.Linear(32, 1)
-    
-
+        self.drop_layer = nn.Dropout(p=0.05)
+        
     def forward(self, x):
         x = F.leaky_relu(self.fc1(x))
+        x = self.drop_layer(x)
         x = F.leaky_relu(self.fc2(x))
+        x = self.drop_layer(x)
         x = F.leaky_relu(self.fc3(x))
+        x = self.drop_layer(x)
         x = self.fc4(x)
 
         return x
@@ -31,8 +34,7 @@ class Regressor(pl.LightningModule):
         self.log('rmse_train', torch.sqrt(loss), on_step=True, on_epoch=False, logger=True, prog_bar=True)
         
         return {'loss': loss}
-    
-    
+      
     def validation_step(self, batch, batch_idx):
         x, y = batch
         logits = self.forward(x)
@@ -42,7 +44,6 @@ class Regressor(pl.LightningModule):
         
         return {'val_loss': val_loss}
     
-
     def training_epoch_end(self, outputs):
         avg_train_loss = torch.stack([torch.sqrt(x['loss']) for x in outputs]).mean()
         
